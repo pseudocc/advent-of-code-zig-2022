@@ -1,5 +1,10 @@
 const std = @import("std");
 
+const input = struct {
+    const example = @embedFile("example");
+    const puzzle = @embedFile("puzzle");
+};
+
 const Move = enum(u8) {
     Rock = 1,
     Paper = 2,
@@ -72,37 +77,34 @@ fn Round(comptime T: type) type {
 }
 
 const RoundIterator = struct {
-    reader: std.fs.File.Reader,
+    lines: std.mem.SplitIterator(u8),
 
     const Self = @This();
 
-    pub fn new(file: std.fs.File) Self {
-        const reader = file.reader();
-        return Self{ .reader = reader };
+    pub fn new(raw: []const u8) Self {
+        const lines = std.mem.split(u8, raw, "\n");
+        return Self{ .lines = lines };
     }
 
     pub fn next(self: *Self, comptime T: type) ?Round(T) {
-        const opponent = self.reader.readByte() catch return null;
-        self.reader.skipBytes(1, .{}) catch return null;
-        const player = self.reader.readByte() catch return null;
-        defer self.reader.skipBytes(1, .{}) catch {};
+        const line = self.lines.next() orelse return null;
+        var tokens = std.mem.tokenize(u8, line, " ");
+
+        const opponent = tokens.next() orelse return null;
+        const player = tokens.next() orelse return null;
 
         const opponent_offset: u8 = 'A' - 1;
         const player_offset: u8 = 'X' - 1;
 
         return Round(T){
-            .opponent = @intToEnum(Move, opponent - opponent_offset),
-            .player = @intToEnum(T, player - player_offset),
+            .opponent = @intToEnum(Move, opponent[0] - opponent_offset),
+            .player = @intToEnum(T, player[0] - player_offset),
         };
     }
 };
 
 pub fn tournament(comptime T: type, comptime entry: []const u8) !u32 {
-    const cwd = std.fs.cwd();
-    const file = try cwd.openFile(entry, .{ .mode = .read_only });
-
-    var iter = RoundIterator.new(file);
-    defer iter.reader.context.close();
+    var iter = RoundIterator.new(entry);
 
     var score: u32 = 0;
     while (true) {
@@ -118,16 +120,16 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     defer stdout.context.close();
 
-    score = try tournament(Move, "test");
+    score = try tournament(Move, input.example);
     try stdout.print("P1 test score: {}\n", .{score});
 
-    score = try tournament(Result, "test");
+    score = try tournament(Result, input.example);
     try stdout.print("P2 test score: {}\n", .{score});
 
-    score = try tournament(Move, "input");
+    score = try tournament(Move, input.puzzle);
     try stdout.print("P1 score: {}\n", .{score});
 
-    score = try tournament(Result, "input");
+    score = try tournament(Result, input.puzzle);
     try stdout.print("P2 score: {}\n", .{score});
 }
 
@@ -142,15 +144,11 @@ test "single round" {
         .opponent = Move.Rock,
         .player = Result.Win,
     };
-    try std.testing.expectEqual(round_result.score(), 7);
+    try std.testing.expectEqual(round_result.score(), 8);
 }
 
 test "round iterator" {
-    const cwd = std.fs.cwd();
-    const file = try cwd.openFile("test", .{ .mode = .read_only });
-
-    var iter = RoundIterator.new(file);
-    defer iter.reader.context.close();
+    var iter = RoundIterator.new(input.example);
 
     const expected_list = [_]Round(Move){
         Round(Move){
