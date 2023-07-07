@@ -1,5 +1,10 @@
 const std = @import("std");
 
+const input = struct {
+    const example = @embedFile("example");
+    const puzzle = @embedFile("puzzle");
+};
+
 const RucksackError = error{
     NotFound,
     NotEven,
@@ -96,19 +101,11 @@ test "priority" {
 
 test "priority sum" {
     const expect = std.testing.expect;
-    const rucksacks = [_][]const u8{
-        "vJrwpWtwJgWrhcsFMMfFFhFp",
-        "jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL",
-        "PmmdzqPrVvPwwTWBwg",
-        "wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn",
-        "ttgJtRGJQctTZtZT",
-        "CrZsJsPPZsGzwwsLwLmpwMDw",
-    };
-
+    var rucksacks = std.mem.tokenize(u8, input.example, "\n");
     var sum: u32 = undefined;
 
     sum = 0;
-    for (rucksacks) |rucksack| {
+    while (rucksacks.next()) |rucksack| {
         const left = rucksack[0 .. rucksack.len / 2];
         const right = rucksack[rucksack.len / 2 ..];
         const value: u8 = try shared(.Priority, left, right);
@@ -117,10 +114,12 @@ test "priority sum" {
     try expect(sum == 157);
 
     sum = 0;
-    inline for (0..2) |i| {
-        const first = rucksacks[i * 3 + 0];
-        const second = rucksacks[i * 3 + 1];
-        const third = rucksacks[i * 3 + 2];
+    rucksacks.reset();
+    inline for (0..2) |_| {
+        const first = rucksacks.next().?;
+        const second = rucksacks.next().?;
+        const third = rucksacks.next().?;
+
         const value: u8 = try common(.Priority, first, second, third);
         sum += @as(u32, value);
     }
@@ -128,39 +127,29 @@ test "priority sum" {
 }
 
 pub fn main() !void {
-    const alloc = std.heap.page_allocator;
     const stdout = std.io.getStdOut().writer();
-    const input = try std.fs.cwd().openFile("input", .{ .mode = .read_only });
-
-    const reader = input.reader();
-    defer input.close();
-
-    var lines = std.ArrayList([]const u8).init(alloc);
-    defer lines.deinit();
-
-    while (true) {
-        const line = try reader.readUntilDelimiterOrEofAlloc(alloc, '\n', 1024) orelse break;
-        try lines.append(line);
-    }
-
+    var rucksacks = std.mem.tokenize(u8, input.puzzle, "\n");
     var sum: u32 = undefined;
+    var n_rucksacks: u32 = 0;
 
     sum = 0;
-    for (lines.items) |line| {
-        const left = line[0 .. line.len / 2];
-        const right = line[line.len / 2 ..];
+    while (rucksacks.next()) |rucksack| {
+        const left = rucksack[0 .. rucksack.len / 2];
+        const right = rucksack[rucksack.len / 2 ..];
 
         const value: u8 = try shared(.Priority, left, right);
         sum += @as(u32, value);
+        n_rucksacks += 1;
     }
 
     try stdout.print("P1 sum: {}\n", .{sum});
 
     sum = 0;
-    for (0..lines.items.len / 3) |i| {
-        const first = lines.items[i * 3 + 0];
-        const second = lines.items[i * 3 + 1];
-        const third = lines.items[i * 3 + 2];
+    rucksacks.reset();
+    for (0..n_rucksacks / 3) |_| {
+        const first = rucksacks.next().?;
+        const second = rucksacks.next().?;
+        const third = rucksacks.next().?;
 
         const value: u8 = try common(.Priority, first, second, third);
         sum += @as(u32, value);
