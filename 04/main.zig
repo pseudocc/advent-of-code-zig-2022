@@ -14,6 +14,15 @@ const Range = struct {
     pub fn contains(self: *const Self, other: *const Self) bool {
         return self.start <= other.start and self.end >= other.end;
     }
+
+    pub fn overlaps(self: *const Self, other: *const Self) bool {
+        if (self.contains(other) or other.contains(self)) {
+            return true;
+        }
+
+        return self.start <= other.start and self.end >= other.start //
+        or self.start <= other.end and self.end >= other.end;
+    }
 };
 
 const ParseError = error{
@@ -49,18 +58,27 @@ pub fn fully_contained(ranges: [2]Range) bool {
     or ranges[1].contains(&ranges[0]);
 }
 
+pub fn overlaps(ranges: [2]Range) bool {
+    return ranges[0].overlaps(&ranges[1]);
+}
+
 pub fn main() !void {
     var lines = std.mem.tokenize(u8, input.puzzle, "\n");
     var n_fully_contained: usize = 0;
+    var n_overlaps: usize = 0;
 
     while (lines.next()) |line| {
         var ranges = try parse_line(line);
         if (fully_contained(ranges)) {
             n_fully_contained += 1;
         }
+        if (overlaps(ranges)) {
+            n_overlaps += 1;
+        }
     }
 
     std.log.debug("n_fully_contained: {d}\n", .{n_fully_contained});
+    std.log.debug("n_overlaps: {d}\n", .{n_overlaps});
 }
 
 test "example" {
