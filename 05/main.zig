@@ -24,6 +24,7 @@ const ListNode = struct {
 };
 
 const ParsingError = error{Unexpected};
+
 const Cargo = struct {
     stacks: std.ArrayList(?*ListNode),
     arena: std.heap.ArenaAllocator,
@@ -161,4 +162,61 @@ test "move parsing" {
     try expect(1 == move.amount);
     try expect(2 == move.from);
     try expect(0 == move.to);
+}
+
+fn one_crate(raw: []const u8, alloc: Allocator) ![]const u8 {
+    var parts = std.mem.split(u8, raw, "\n\n");
+    const cargo_part = parts.next().?;
+    var cargo = try Cargo.parse(cargo_part, alloc);
+    defer cargo.deinit();
+
+    const moves_part = parts.next().?;
+    var moves = std.mem.tokenize(u8, moves_part, "\n");
+
+    const offset: usize = 1;
+    while (moves.next()) |line| {
+        const move = try Move.parse(line);
+        var from = &cargo.stacks.items[move.from - offset];
+        var to = &cargo.stacks.items[move.to - offset];
+
+        for (0..move.amount) |_| {
+            var next = from.*.?.next;
+            from.*.?.next = to.*;
+            to.* = from.*;
+            from.* = next;
+        }
+    }
+
+    var result = try alloc.alloc(u8, cargo.stacks.items.len);
+    var pos: usize = 0;
+
+    for (cargo.stacks.items) |node| {
+        if (node == null) {
+            continue;
+        }
+        result[pos] = node.?.data;
+        pos += 1;
+    }
+
+    result = try alloc.realloc(result, pos);
+    return result;
+}
+
+test "part 1" {
+    const alloc = std.testing.allocator;
+    const expect = std.testing.expect;
+
+    var result = try one_crate(input.example, alloc);
+    defer alloc.free(result);
+
+    const expected = "CMZ";
+    try expect(std.mem.eql(u8, result, expected));
+}
+
+pub fn main() !void {
+    const alloc = std.heap.page_allocator;
+    const part1 = try one_crate(input.puzzle, alloc);
+    defer alloc.free(part1);
+
+    std.log.debug("part 1: {s}", .{part1});
 }
