@@ -77,6 +77,20 @@ const Cargo = struct {
         };
     }
 
+    pub fn top_crates(self: *Cargo) ![]const u8 {
+        var result = std.ArrayList(u8).init(self.arena.allocator());
+        defer result.deinit();
+
+        for (self.stacks.items) |node| {
+            if (node == null) {
+                continue;
+            }
+            try result.append(node.?.data);
+        }
+
+        return result.toOwnedSlice();
+    }
+
     pub fn deinit(self: *Cargo) void {
         self.arena.deinit();
     }
@@ -164,11 +178,11 @@ test "move parsing" {
     try expect(0 == move.to);
 }
 
-fn one_crate(raw: []const u8, alloc: Allocator) ![]const u8 {
+fn one_crate(raw: []const u8, alloc: Allocator) !Cargo {
     var parts = std.mem.split(u8, raw, "\n\n");
     const cargo_part = parts.next().?;
     var cargo = try Cargo.parse(cargo_part, alloc);
-    defer cargo.deinit();
+    errdefer cargo.deinit();
 
     const moves_part = parts.next().?;
     var moves = std.mem.tokenize(u8, moves_part, "\n");
@@ -187,27 +201,16 @@ fn one_crate(raw: []const u8, alloc: Allocator) ![]const u8 {
         }
     }
 
-    var result = try alloc.alloc(u8, cargo.stacks.items.len);
-    var pos: usize = 0;
-
-    for (cargo.stacks.items) |node| {
-        if (node == null) {
-            continue;
-        }
-        result[pos] = node.?.data;
-        pos += 1;
-    }
-
-    result = try alloc.realloc(result, pos);
-    return result;
+    return cargo;
 }
 
 test "part 1" {
     const alloc = std.testing.allocator;
     const expect = std.testing.expect;
 
-    var result = try one_crate(input.example, alloc);
-    defer alloc.free(result);
+    var cargo = try one_crate(input.example, alloc);
+    var result = try cargo.top_crates();
+    defer cargo.deinit();
 
     const expected = "CMZ";
     try expect(std.mem.eql(u8, result, expected));
@@ -215,8 +218,9 @@ test "part 1" {
 
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
-    const part1 = try one_crate(input.puzzle, alloc);
-    defer alloc.free(part1);
+    var part1 = try one_crate(input.puzzle, alloc);
+    defer part1.deinit();
 
-    std.log.debug("part 1: {s}", .{part1});
+    const part1_result = try part1.top_crates();
+    std.log.debug("part 1: {s}", .{part1_result});
 }
