@@ -2,7 +2,7 @@ const std = @import("std");
 
 const input = struct {
     const example = @embedFile("example");
-    const puzzle = @embedFile("example");
+    const puzzle = @embedFile("puzzle");
 };
 
 const Allocator = std.mem.Allocator;
@@ -81,6 +81,47 @@ const Cargo = struct {
     }
 };
 
+const Move = struct {
+    from: usize,
+    to: usize,
+    amount: usize,
+
+    pub fn parse(line: []const u8) !Move {
+        var black_hole: []const u8 = undefined;
+        var parts = std.mem.tokenize(u8, line, " ");
+
+        black_hole = parts.next() orelse return ParsingError.Unexpected;
+        if (!std.mem.eql(u8, black_hole, "move")) {
+            return ParsingError.Unexpected;
+        }
+
+        const amount_str = parts.next() orelse return ParsingError.Unexpected;
+        const amount = try std.fmt.parseUnsigned(usize, amount_str, 0);
+
+        black_hole = parts.next() orelse return ParsingError.Unexpected;
+        if (!std.mem.eql(u8, black_hole, "from")) {
+            return ParsingError.Unexpected;
+        }
+
+        const from_str = parts.next() orelse return ParsingError.Unexpected;
+        const from = try std.fmt.parseUnsigned(usize, from_str, 0);
+
+        black_hole = parts.next() orelse return ParsingError.Unexpected;
+        if (!std.mem.eql(u8, black_hole, "to")) {
+            return ParsingError.Unexpected;
+        }
+
+        const to_str = parts.next() orelse return ParsingError.Unexpected;
+        const to = try std.fmt.parseUnsigned(usize, to_str, 0);
+
+        return Move{
+            .from = from,
+            .to = to,
+            .amount = amount,
+        };
+    }
+};
+
 test "list invert" {
     const expect = std.testing.expect;
 
@@ -111,4 +152,13 @@ test "cargo parsing" {
     try expect('N' == stack0.?.data);
     try expect('Z' == stack0.?.next.?.data);
     try expect(null == stack0.?.next.?.next);
+}
+
+test "move parsing" {
+    const expect = std.testing.expect;
+
+    var move = try Move.parse("move 1 from 2 to 0");
+    try expect(1 == move.amount);
+    try expect(2 == move.from);
+    try expect(0 == move.to);
 }
