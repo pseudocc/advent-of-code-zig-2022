@@ -204,6 +204,34 @@ fn one_crate(raw: []const u8, alloc: Allocator) !Cargo {
     return cargo;
 }
 
+fn multiple_crates(raw: []const u8, alloc: Allocator) !Cargo {
+    var parts = std.mem.split(u8, raw, "\n\n");
+    const cargo_part = parts.next().?;
+    var cargo = try Cargo.parse(cargo_part, alloc);
+    errdefer cargo.deinit();
+
+    const moves_part = parts.next().?;
+    var moves = std.mem.tokenize(u8, moves_part, "\n");
+
+    const offset: usize = 1;
+    while (moves.next()) |line| {
+        const move = try Move.parse(line);
+        var from = &cargo.stacks.items[move.from - offset];
+        var to = &cargo.stacks.items[move.to - offset];
+
+        const head = from.*;
+        var tail = from;
+        for (0..move.amount) |_| {
+            tail = &tail.*.?.next;
+        }
+        from.* = tail.*;
+        tail.* = to.*;
+        to.* = head;
+    }
+
+    return cargo;
+}
+
 test "part 1" {
     const alloc = std.testing.allocator;
     const expect = std.testing.expect;
@@ -216,11 +244,30 @@ test "part 1" {
     try expect(std.mem.eql(u8, result, expected));
 }
 
+test "part 2" {
+    const alloc = std.testing.allocator;
+    const expect = std.testing.expect;
+
+    var cargo = try multiple_crates(input.example, alloc);
+    var result = try cargo.top_crates();
+    defer cargo.deinit();
+
+    const expected = "MCD";
+    try expect(std.mem.eql(u8, result, expected));
+}
+
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
+
     var part1 = try one_crate(input.puzzle, alloc);
     defer part1.deinit();
 
     const part1_result = try part1.top_crates();
     std.log.debug("part 1: {s}", .{part1_result});
+
+    var part2 = try multiple_crates(input.puzzle, alloc);
+    defer part2.deinit();
+
+    const part2_result = try part2.top_crates();
+    std.log.debug("part 2: {s}", .{part2_result});
 }
