@@ -47,8 +47,7 @@ const UniqMark = struct {
     }
 };
 
-fn first_marker(data_stream: []const u8) usize {
-    const target: usize = 4;
+fn first_marker(data_stream: []const u8, target: usize) usize {
     var mark = UniqMark.new();
     var position: usize = 0;
 
@@ -64,13 +63,16 @@ fn first_marker(data_stream: []const u8) usize {
 }
 
 pub fn main() !void {
-    const position = first_marker(input.puzzle);
+    var position: usize = undefined;
+
+    position = first_marker(input.puzzle, 4);
     std.log.debug("P1 first marker position: {}\n", .{position});
+
+    position = first_marker(input.puzzle, 14);
+    std.log.debug("P2 first marker position: {}\n", .{position});
 }
 
 test "first_marker" {
-    const expected: usize = 7;
-    const actual: usize = first_marker(input.example);
-
-    try std.testing.expectEqual(expected, actual);
+    try std.testing.expect(first_marker(input.example, 4) == 7);
+    try std.testing.expect(first_marker(input.example, 14) == 19);
 }
